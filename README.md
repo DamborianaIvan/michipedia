@@ -44,6 +44,7 @@ No publicamos en App Store ni configuramos credenciales. No se ejecutaron builds
 - Gato nuevo o reencuentro; nombre opcional y número automático.
 - Guardado local: archivos en directorio de documentos + AsyncStorage en móvil; IndexedDB en web.
 - Eliminación de encuentro con confirmación; el último elimina también la ficha del gato.
+- Celebración animada con la foto al descubrir un michi nuevo; respeta la opción de reducir movimiento del dispositivo. La Gatopedia y sus tarjetas también aparecen con una entrada suave.
 - Datos de usuario insertados como texto, sin HTML dinámico.
 
 ## Alcance y límites
@@ -55,6 +56,7 @@ El mapa usa **Liberty de OpenFreeMap**, con calles y nombres de OpenStreetMap/Op
 ## Organización
 
 - `App.tsx`: pantallas y recorrido operativo.
+- `src/components/CatAddedCelebration.tsx`: celebración de alta hecha con React Native Reanimated, compartida entre web y móvil.
 - `src/components/EncounterMap.*`: mapas por plataforma.
 - `src/hooks/useLocation.ts`: permiso y ciclo de vida del GPS.
 - `src/domain/model.ts`: gatos/encuentros y reglas compartidas.
@@ -84,6 +86,7 @@ npm run build:web
 - TypeScript: PASS.
 - Reglas de colección: 4 pruebas PASS.
 - Exportación Metro para web, iOS y Android: PASS.
+- Reanimated y Worklets: versiones instaladas según Expo SDK 57; las animaciones compilan para web, iOS y Android.
 - Compatibilidad de dependencias con las recomendaciones incluidas en Expo SDK 57: PASS (comprobación offline).
 - Pendiente: prueba visual en navegador, compilación nativa con firma, instalación en iPhone y pruebas reales de GPS/cámara. Exportar JavaScript/Hermes no equivale a compilar la app nativa.
 
