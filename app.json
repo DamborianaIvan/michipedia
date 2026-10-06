@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Michipedia",
+    "slug": "michipedia",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.michipedia.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.michipedia.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "scheme": "michipedia",
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Michipedia usa tu ubicación para mostrar dónde caminás y guardar el punto de tus encuentros."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Elegí una foto de un michi para guardar un encuentro.",
+          "cameraPermission": "Tomá una foto del michi para sumarlo a tu colección.",
+          "microphonePermission": false
+        }
+      ],
+      "@maplibre/maplibre-react-native"
+    ]
+  }
+}
