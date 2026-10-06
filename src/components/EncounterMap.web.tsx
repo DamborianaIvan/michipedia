@@ -13,7 +13,8 @@ export default function EncounterMap(props: MapProps) {
     if (!container.current) return;
     try {
       const instance = new maplibregl.Map({ container: container.current, style: mapStyle, center: [-58.3816, -34.6037], zoom: 12 }); map.current = instance;
-      instance.addControl(new maplibregl.NavigationControl());
+      instance.addControl(new maplibregl.NavigationControl(), 'top-right');
+      instance.addControl(new maplibregl.FullscreenControl(), 'top-right');
       instance.on('load', () => setLoaded(true)); instance.on('error', () => setError(true));
       instance.on('dragstart', () => current.current.onPan());
       instance.on('click', event => current.current.onPick?.({ latitude: event.lngLat.lat, longitude: event.lngLat.lng, accuracy: null, source: 'manual', timestamp: Date.now() }));

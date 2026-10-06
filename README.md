@@ -50,7 +50,7 @@ No publicamos en App Store ni configuramos credenciales. No se ejecutaron builds
 
 Sin cuenta, servidor, sincronización, importación de la alfa anterior, respaldo, reconocimiento por IA ni seguimiento de caminatas en segundo plano. Datos locales pueden perderse al desinstalar o borrar almacenamiento. Las colecciones móvil/web son independientes.
 
-MapLibre utiliza cartografía **de demostración**, sin garantía de detalle callejero. Antes de una beta caminando configurar proveedor real con licencia, cobertura y cuota apropiadas. Definir `EXPO_PUBLIC_MAP_STYLE_URL` en `.env` (copiar `.env.example`); no colocar secretos. Los pedidos del mapa se envían al proveedor de cartografía.
+El mapa usa **Liberty de OpenFreeMap**, con calles y nombres de OpenStreetMap/OpenMapTiles; funciona con MapLibre en web, iOS y Android y no requiere clave. Incluye controles para acercar/alejar en móvil y pantalla completa en web. MapLibre muestra la atribución del proveedor. La instancia pública es gratuita y sin límites publicados, pero no ofrece un SLA; la disponibilidad del mapa depende de su servicio. Para el lanzamiento se puede reevaluar el proveedor según cobertura y disponibilidad. Definir `EXPO_PUBLIC_MAP_STYLE_URL` en `.env` para cambiar el estilo (valor público, no poner secretos). Al cargar o navegar el mapa, el navegador y la app piden estilos/tiles al proveedor.
 
 ## Organización
 
