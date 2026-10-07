@@ -5,7 +5,7 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
 export class AuthError extends Error {}
 
 async function request<T>(path: string, body?: unknown, token?: string): Promise<T> {
-  if (!apiUrl) throw new AuthError('Falta configurar la dirección de la API de Michipedia.');
+  if (!apiUrl) throw new AuthError('Falta EXPO_PUBLIC_API_URL en frontend/.env. Reiniciá Expo después de configurarla.');
   let response: Response;
   try {
     response = await fetch(`${apiUrl}${path}`, {

@@ -1,29 +1,50 @@
-# Michipedia · React Native + Expo + TypeScript
+# Michipedia · Expo + TypeScript
 
 Alfa F0/F1: explorar con mapa, fotografiar gatos reales y coleccionar sus encuentros. Plataforma principal: iPhone, con soporte Android y vista web para desarrollar desde la PC.
 
+## Estructura
+
+- `frontend/`: aplicación Expo para iOS, Android y web.
+- `backend/`: API Node/Express y modelos de usuario de Michipedia.
+- `package.json` en la raíz: workspaces y comandos para iniciar y validar ambos proyectos.
+
 ## Probar en la PC
 
-Requiere Node.js 22.18 o superior; recomendamos Node 24 LTS.
-Copiá `.env.example` a `.env` y configurá `EXPO_PUBLIC_API_URL`. Para probar en la misma PC, la API local usa `http://localhost:4000`.
+Requiere Node.js 22.18 o superior; recomendamos Node 24 LTS. Desde la raíz del repositorio, instalá las dependencias de los dos workspaces:
 
 ```sh
 npm ci
-npm install --prefix backend
-npm run web
 ```
 
-La API se ejecuta por separado:
+Copiá los archivos de ejemplo:
 
 ```sh
+cp frontend/.env.example frontend/.env
 cp backend/.env.example backend/.env
-# completar MONGODB_URI y JWT_SECRET en backend/.env
+```
+
+En Windows PowerShell:
+
+```powershell
+Copy-Item frontend/.env.example frontend/.env
+Copy-Item backend/.env.example backend/.env
+```
+
+En `backend/.env`, completá `MONGODB_URI` con la base de Michipedia en Atlas y generá un `JWT_SECRET` privado. En `frontend/.env`, `EXPO_PUBLIC_API_URL=http://localhost:4000` apunta a la API local.
+
+Iniciá cada servicio en una terminal desde la raíz:
+
+```sh
 npm run api
 ```
 
-En Windows PowerShell, podés copiar los ejemplos con `Copy-Item .env.example .env` y `Copy-Item backend/.env.example backend/.env`. Para abrir la web desde otro equipo de la red, configurá `EXPO_PUBLIC_API_URL` con la IP de la PC; agregá también el origen web a `CORS_ORIGINS` en `backend/.env`.
+```sh
+npm run web
+```
 
-Expo abre el navegador. Para GPS en la PC usar localhost o HTTPS y conceder permiso de ubicación. El navegador puede dar una ubicación menos precisa que el GPS del teléfono.
+Expo abre el navegador y el login llama a `POST /api/auth/login` en esa API. Para abrir la web desde un iPhone en la misma red, usá la IP de la PC en `EXPO_PUBLIC_API_URL` (por ejemplo `http://192.168.1.20:4000`) y agregá el origen de Expo sin barra final a `CORS_ORIGINS` (por ejemplo `http://192.168.1.20:8081`). Reiniciá Expo al cambiar el archivo `.env`.
+
+Para GPS en la PC usar localhost o HTTPS y conceder permiso de ubicación. El navegador puede dar una ubicación menos precisa que el GPS del teléfono.
 
 La vista web comparte pantallas, tipos y lógica con móvil. El mapa y almacenamiento se resuelven por plataforma: `EncounterMap.web.tsx` usa MapLibre GL JS; `EncounterMap.native.tsx` usa MapLibre Native. La cámara web depende del selector ofrecido por el navegador; no replica la experiencia nativa.
 
@@ -71,28 +92,29 @@ El mapa usa **Liberty de OpenFreeMap**, con calles y nombres de OpenStreetMap/Op
 
 ## Organización
 
-- `App.tsx`: pantallas y recorrido operativo.
-- `src/components/CatAddedCelebration.tsx`: celebración de alta hecha con React Native Reanimated, compartida entre web y móvil.
-- `src/components/EncounterMap.*`: mapas por plataforma.
-- `src/hooks/useLocation.ts`: permiso y ciclo de vida del GPS.
-- `src/domain/model.ts`: gatos/encuentros y reglas compartidas.
-- `src/services/storage.*`: persistencia y fotos por plataforma.
-- `src/auth/*`: autenticación y almacenamiento de sesión según plataforma.
-- `src/components/AuthScreen.tsx`: acceso y creación de cuenta.
+- `frontend/App.tsx`: pantallas y recorrido operativo.
+- `frontend/src/components/CatAddedCelebration.tsx`: celebración de alta hecha con React Native Reanimated, compartida entre web y móvil.
+- `frontend/src/components/EncounterMap.*`: mapas por plataforma.
+- `frontend/src/hooks/useLocation.ts`: permiso y ciclo de vida del GPS.
+- `frontend/src/domain/model.ts`: gatos/encuentros y reglas compartidas.
+- `frontend/src/services/storage.*`: persistencia y fotos por plataforma.
+- `frontend/src/auth/*`: autenticación, llamadas a la API y sesión según plataforma.
+- `frontend/src/components/AuthScreen.tsx`: acceso y creación de cuenta.
 - `backend/*`: API Node/Express y modelos de cuenta para la base de Michipedia.
-- `tests/model.test.mjs`: reglas de colección y coordenadas.
-- `app.json`: permisos y plugins.
-- `eas.json`: compilaciones de desarrollo, simulador y producción.
+- `frontend/tests/model.test.mjs`: reglas de colección y coordenadas.
+- `frontend/app.json`: permisos y plugins.
+- `frontend/eas.json`: compilaciones de desarrollo, simulador y producción.
 
 ## Verificar
 
 ```sh
 npm run typecheck
 npm test
+npm run test:api
 npm run build:web
 ```
 
-La API necesita una base MongoDB Atlas independiente para Michipedia. Puede alojarse en el clúster de Atlas ya usado por Pepes, pero no se deben compartir `MONGODB_URI` ni `JWT_SECRET`. Configurá `MONGODB_URI`, `JWT_SECRET` y `CORS_ORIGINS` en el servicio de la API, y `EXPO_PUBLIC_API_URL` en la app. Esta última URL es pública; no pongas secretos allí.
+La API necesita una base MongoDB Atlas independiente para Michipedia. Puede alojarse en el clúster de Atlas ya usado por Pepes, pero no se deben compartir `MONGODB_URI` ni `JWT_SECRET`. En Render, configurá el directorio raíz `backend`, comando de build `npm ci`, comando de inicio `npm start` y las variables `MONGODB_URI`, `JWT_SECRET` y `CORS_ORIGINS`. En la app, configurá `EXPO_PUBLIC_API_URL` con la URL HTTPS de Render; esta última URL es pública, no pongas secretos allí.
 
 Para generar un `JWT_SECRET` local con Node, ejecutá `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; mantenelo privado y usá otro valor distinto en producción.
 
