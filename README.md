@@ -42,6 +42,7 @@ No publicamos en App Store ni configuramos credenciales. No se ejecutaron builds
 - Punto congelado antes de abrir cámara/selector; no reemplazarlo por una ubicación tomada después. Revisar si hubo desplazamiento o si se selecciona una foto antigua. La fecha corresponde al inicio del registro, no se lee EXIF.
 - Coordenadas manuales o selección del punto tocando el mapa.
 - Gato nuevo o reencuentro; nombre opcional y número automático.
+- Cada encuentro aparece en el mapa con una miniatura circular de su foto; al tocarla se abre la ficha del michi con sus encuentros, fechas y ubicaciones.
 - Guardado local: archivos en directorio de documentos + AsyncStorage en móvil; IndexedDB en web.
 - Eliminación de encuentro con confirmación; el último elimina también la ficha del gato.
 - Celebración animada con la foto al descubrir un michi nuevo; respeta la opción de reducir movimiento del dispositivo. La Gatopedia y sus tarjetas también aparecen con una entrada suave.
