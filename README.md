@@ -94,6 +94,8 @@ npm run build:web
 
 La API necesita una base MongoDB Atlas independiente para Michipedia. Puede alojarse en el clúster de Atlas ya usado por Pepes, pero no se deben compartir `MONGODB_URI` ni `JWT_SECRET`. Configurá `MONGODB_URI`, `JWT_SECRET` y `CORS_ORIGINS` en el servicio de la API, y `EXPO_PUBLIC_API_URL` en la app. Esta última URL es pública; no pongas secretos allí.
 
+Para generar un `JWT_SECRET` local con Node, ejecutá `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`; mantenelo privado y usá otro valor distinto en producción.
+
 ## Próximos hitos
 
 1. Configurar proveedor con calles y abrir una compilación en el iPhone.
