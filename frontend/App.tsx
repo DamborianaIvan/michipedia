@@ -1,27 +1,38 @@
+import { PlayfulPressable, CuriousCat } from './src/components/PlayfulMotion';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import * as Crypto from 'expo-crypto';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { CatAddedCelebration } from './src/components/CatAddedCelebration';
+import { AuthScreen } from './src/components/AuthScreen';
 import EncounterMap from './src/components/EncounterMap';
+import { clearSession, loadSession, saveSession } from './src/auth/session';
+import { verifySession } from './src/auth/api';
+import type { Session } from './src/auth/types';
 import { useLocation } from './src/hooks/useLocation';
 import { addEncounter, emptyCollection, removeEncounter, validPoint, type Collection, type Point } from './src/domain/model';
 import { deletePhoto, loadCollection, persistPhoto, saveCollection } from './src/services/storage';
 
 type Tab = 'explore' | 'collection' | 'profile';
 type Draft = { uri: string; at: string; point: Point | null };
+type Celebration = { photoUri: string; catName: string; catNumber: number };
 const green = '#245b49';
 function Button({ label, onPress, primary = false, disabled = false }: { label: string; onPress: () => void; primary?: boolean; disabled?: boolean }) {
-  return <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [s.button, primary && s.primary, (pressed || disabled) && { opacity: .6 }]}><Text style={[s.buttonText, primary && { color: 'white' }]}>{label}</Text></Pressable>;
+  return <PlayfulPressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [s.button, primary && s.primary, (pressed || disabled) && { opacity: .6 }]}><Text style={[s.buttonText, primary && { color: 'white' }]}>{label}</Text></PlayfulPressable>;
 }
 export default function App() { return <SafeAreaProvider><Michipedia /></SafeAreaProvider>; }
 function Michipedia() {
   const [tab, setTab] = useState<Tab>('explore');
   const [collection, setCollection] = useState<Collection>(emptyCollection);
   const [ready, setReady] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [notice, setNotice] = useState('');
+  const [celebration, setCelebration] = useState<Celebration | null>(null);
   const [capture, setCapture] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [name, setName] = useState('');
@@ -40,8 +51,38 @@ function Michipedia() {
   const locked = useRef(false);
   const selectedPoint = draft?.point ?? null;
   const cat = collection.cats.find(c => c.id === selectedCat);
-  useEffect(() => { void loadCollection().then(data => { setCollection(data); setReady(true); }).catch(() => { setLoadError(true); setNotice('No pudimos abrir la colección. Reiniciá la app; no sobrescribiremos tus datos.'); }); }, []);
+  useEffect(() => {
+    void (async () => {
+      const stored = await loadSession();
+      if (stored) {
+        try {
+          const user = await verifySession(stored.token);
+          setSession({ ...stored, user });
+        } catch { await clearSession(); }
+      }
+      setAuthReady(true);
+    })().catch(() => setAuthReady(true));
+  }, []);
+  useEffect(() => {
+    if (!session) { setCollection(emptyCollection()); setReady(false); return; }
+    setReady(false); setLoadError(false);
+    void loadCollection(session.user.id).then(data => { setCollection(data); setReady(true); }).catch(() => { setLoadError(true); setNotice('No pudimos abrir la colección. Reiniciá la app; no sobrescribiremos tus datos.'); });
+  }, [session?.user.id]);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 6000); return () => clearTimeout(timer); }, [notice]);
+  const onAuthenticated = async (nextSession: Session) => {
+    await saveSession(nextSession);
+    setSession(nextSession);
+    setTab('explore');
+  };
+  const signOut = async () => {
+    await clearSession();
+    setSession(null);
+    setSelectedCat(null);
+    setCapture(false);
+    setDraft(null);
+  };
+  if (!authReady) return <SafeAreaView style={[s.root, { justifyContent: 'center' }]}><ActivityIndicator color={green} /></SafeAreaView>;
+  if (!session) return <AuthScreen onAuthenticated={onAuthenticated} />;
   const beginCapture = () => { setDraft(null); setName(''); setExisting(null); setLatitude(''); setLongitude(''); setManual(false); setPicking(false); setCapture(true); };
   const choosePhoto = async (camera: boolean) => {
     if (busy) return;
@@ -74,7 +115,15 @@ function Michipedia() {
       const encounter = { id, catId: existing || Crypto.randomUUID(), photoUri: savedUri, capturedAt: draft.at,
         point: { latitude: Number(latitude), longitude: Number(longitude), accuracy: manual ? null : draft.point?.accuracy ?? null, source: manual ? 'manual' as const : draft.point?.source ?? 'manual' as const, timestamp: draft.point?.timestamp ?? Date.now() } };
       const next = addEncounter(collection, encounter, name, existing);
-      await saveCollection(next); setCollection(next); setCapture(false); setDraft(null); setTab('collection'); setNotice('¡Encuentro guardado! Un nuevo recuerdo en tu Gatopedia.');
+      const savedCat = next.cats.find(item => item.id === encounter.catId);
+      await saveCollection(next, session.user.id);
+      setCollection(next); setCapture(false); setDraft(null); setTab('collection');
+      if (!existing && savedCat) {
+        setNotice('');
+        setCelebration({ photoUri: savedUri, catName: savedCat.name, catNumber: savedCat.number });
+      } else {
+        setNotice('¡Encuentro guardado! Un nuevo recuerdo en tu Gatopedia.');
+      }
     } catch {
       if (savedUri) await deletePhoto(savedUri).catch(() => {});
       setNotice('No se pudo guardar. Conservamos tu foto para que puedas reintentar.');
@@ -86,27 +135,27 @@ function Michipedia() {
     try {
       const encounter = collection.encounters.find(e => e.id === pendingDelete);
       const next = removeEncounter(collection, pendingDelete);
-      await saveCollection(next); setCollection(next); setPendingDelete(null);
+      await saveCollection(next, session.user.id); setCollection(next); setPendingDelete(null);
       if (!next.cats.some(c => c.id === selectedCat)) setSelectedCat(null);
       if (encounter) await deletePhoto(encounter.photoUri).catch(() => setNotice('Encuentro eliminado; quedó un archivo local pendiente de limpiar.'));
     } catch { setNotice('No se pudo eliminar. Tus datos siguen guardados.'); } finally { locked.current = false; setSaving(false); }
   };
   return <SafeAreaView style={s.root} edges={['top', 'bottom']}><StatusBar style="dark" />
-    <View style={s.header}><View><Text style={s.brand}>♧ michipedia</Text><Text style={s.tagline}>CADA MICHI, UNA HISTORIA</Text></View><Text style={s.badge}>ALFA · LOCAL</Text></View>
+    <View style={s.header}><View><Text style={s.brand}>♧ michipedia</Text><Text style={s.tagline}>CADA MICHI, UNA HISTORIA</Text></View><Text style={s.badge}>HOLA, {session.user.name.toUpperCase()}</Text></View>
     {tab === 'explore' && <View style={s.explore}>
-      <View style={s.intro}><Text style={s.eyebrow}>TU PRÓXIMA HISTORIA ESTÁ CERCA</Text><Text style={s.title}>Salí a conocer el barrio.{ '\n' }<Text style={s.accent}>Y sus michis.</Text></Text><Text style={s.subtitle}>Una foto, un encuentro, un nuevo amigo.</Text><Text style={s.counter}>{collection.cats.length} michis descubiertos  ·  {collection.encounters.length} encuentros</Text></View>
-      <View style={s.mapShell}><EncounterMap point={point} follow={follow} encounters={collection.encounters} selected={selectedPoint} onPan={() => setFollow(false)} onEncounter={setSelectedCat} onPick={picking ? chosen => { setDraft(old => old ? { ...old, point: chosen } : old); setLatitude(String(chosen.latitude)); setLongitude(String(chosen.longitude)); setManual(true); setPicking(false); setCapture(true); } : undefined} />
+      <View style={s.intro}><Animated.Text entering={FadeInDown.duration(420)} style={s.eyebrow}>TU PRÓXIMA HISTORIA ESTÁ CERCA</Animated.Text><Animated.Text entering={FadeInDown.delay(70).duration(500)} style={s.title}>Salí a conocer el barrio.{ '\n' }<Text style={s.accent}>Y sus michis.</Text></Animated.Text><Animated.Text entering={FadeInDown.delay(140).duration(500)} style={s.subtitle}>Una foto, un encuentro, un nuevo amigo.</Animated.Text><Text style={s.counter}>{collection.cats.length} michis descubiertos  ·  {collection.encounters.length} encuentros</Text></View>
+      <View style={s.mapShell}><EncounterMap point={point} follow={follow} cats={collection.cats} encounters={collection.encounters} selected={selectedPoint} onPan={() => setFollow(false)} onEncounter={setSelectedCat} onPick={picking ? chosen => { setDraft(old => old ? { ...old, point: chosen } : old); setLatitude(String(chosen.latitude)); setLongitude(String(chosen.longitude)); setManual(true); setPicking(false); setCapture(true); } : undefined} />
         <View style={s.mapTop}><Text style={s.gps}>{status}</Text><Button label="◎ Seguir mi ubicación" onPress={() => { setFollow(true); void start(); }} /></View>
         <View style={s.mapBottom}>{picking ? <View style={s.pickHint}><Text style={s.body}>Tocá el mapa en el punto del encuentro.</Text><Button label="Volver a la foto" onPress={() => { setPicking(false); setCapture(true); }} /></View> : <Button label="＋ Capturar michi" primary disabled={!ready} onPress={beginCapture} />}</View>
       </View><Text style={s.note}>Capturar es fotografiar. Dejá que el michi siga su camino.</Text>
     </View>}
-    {tab === 'collection' && <ScrollView contentContainerStyle={s.page}><Text style={s.eyebrow}>PEQUEÑOS ENCUENTROS, GRANDES HISTORIAS</Text><Text style={s.title}>Tu Gatopedia.</Text><Text style={s.subtitle}>{collection.cats.length} michis · {collection.encounters.length} encuentros</Text>
-      {!ready ? <Text style={s.body}>{loadError ? 'Colección no disponible. Reiniciá para reintentar.' : 'Abriendo tu colección…'}</Text> : !collection.cats.length ? <View style={s.empty}><Text style={s.bigCat}>🐈</Text><Text style={s.sectionTitle}>Tu primer michi te espera</Text><Text style={s.body}>Guardá una foto para empezar tu álbum.</Text><Button label="Capturar mi primer michi" primary onPress={beginCapture} /></View> : <View style={s.grid}>{collection.cats.map(item => { const meets = collection.encounters.filter(e => e.catId === item.id); return <Pressable accessibilityRole="button" accessibilityLabel={`Ver ${item.name}`} key={item.id} style={s.card} onPress={() => setSelectedCat(item.id)}><Image source={{ uri: meets[meets.length - 1].photoUri }} style={s.cardPhoto} /><View style={s.cardBody}><Text style={s.eyebrow}>MICHI #{String(item.number).padStart(3, '0')}</Text><Text style={s.sectionTitle}>{item.name}</Text><Text style={s.body}>{meets.length} encuentro{meets.length === 1 ? '' : 's'}</Text></View></Pressable>; })}</View>}
+    {tab === 'collection' && <ScrollView contentContainerStyle={s.page}><Animated.Text entering={FadeInDown.duration(420)} style={s.eyebrow}>PEQUEÑOS ENCUENTROS, GRANDES HISTORIAS</Animated.Text><Animated.Text entering={FadeInDown.delay(70).duration(500)} style={s.title}>Tu Gatopedia.</Animated.Text><Text style={s.subtitle}>{collection.cats.length} michis · {collection.encounters.length} encuentros</Text>
+      {!ready ? <Text style={s.body}>{loadError ? 'Colección no disponible. Reiniciá para reintentar.' : 'Abriendo tu colección…'}</Text> : !collection.cats.length ? <View style={s.empty}><CuriousCat /><Text style={s.sectionTitle}>Tu primer michi te espera</Text><Text style={s.body}>Guardá una foto para empezar tu álbum.</Text><Button label="Capturar mi primer michi" primary onPress={beginCapture} /></View> : <View style={s.grid}>{collection.cats.map((item, index) => { const meets = collection.encounters.filter(e => e.catId === item.id); return <Animated.View key={item.id} entering={FadeInDown.delay(Math.min(index * 55, 330)).duration(420)} style={s.card}><PlayfulPressable accessibilityRole="button" accessibilityLabel={`Ver ${item.name}`} style={{ flex: 1 }} onPress={() => setSelectedCat(item.id)}><Image source={{ uri: meets[meets.length - 1].photoUri }} style={s.cardPhoto} /><View style={s.cardBody}><Text style={s.eyebrow}>MICHI #{String(item.number).padStart(3, '0')}</Text><Text style={s.sectionTitle}>{item.name}</Text><Text style={s.body}>{meets.length} encuentro{meets.length === 1 ? '' : 's'}</Text></View></PlayfulPressable></Animated.View>; })}</View>}
     </ScrollView>}
-    {tab === 'profile' && <ScrollView contentContainerStyle={s.page}><Text style={s.eyebrow}>TU AVENTURA</Text><Text style={s.title}>De a un michi.</Text><View style={s.info}><Text style={s.sectionTitle}>Primera expedición</Text><Text style={s.body}>Esta alfa guarda tu colección en este dispositivo. Todavía no hay cuenta ni sincronización. Desinstalar la app o borrar los datos del navegador puede eliminar tus encuentros.</Text><Text style={s.sectionTitle}>Caminar, mirar, descubrir</Text><Text style={s.body}>Activá la ubicación con la app abierta. Al mover el mapa se pausa el centrado; podés volver con “Seguir mi ubicación”. No almacenamos tu caminata.</Text><Text style={s.sectionTitle}>Mapa de prueba</Text><Text style={s.body}>Usamos cartografía de demostración. El proveedor con detalle de calles se configurará antes de la beta.</Text></View></ScrollView>}
-    <View style={s.navigation}>{([['explore', '◎', 'Explorar'], ['collection', '▧', 'Gatopedia'], ['profile', '♧', 'Mi aventura']] as const).map(([id, icon, label]) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === id }} key={id} onPress={() => { if (picking) { setPicking(false); setCapture(true); } setTab(id); }} style={[s.navButton, tab === id && s.navSelected]}><Text style={s.navIcon}>{icon}</Text><Text style={s.navLabel}>{label}</Text></Pressable>)}</View>
+    {tab === 'profile' && <ScrollView contentContainerStyle={s.page}><Text style={s.eyebrow}>TU AVENTURA</Text><Animated.Text entering={FadeInDown.duration(500)} style={s.title}>De a un michi.</Animated.Text><View style={s.info}><Text style={s.sectionTitle}>Tu cuenta</Text><Text style={s.body}>{session.user.name}{'\n'}{session.user.email}</Text><Button label="Cerrar sesión" onPress={() => void signOut()} /><Text style={s.sectionTitle}>Tu Gatopedia</Text><Text style={s.body}>Durante esta primera etapa, las fotos y los encuentros se guardan en este dispositivo; todavía no se sincronizan entre equipos.</Text><Text style={s.sectionTitle}>Caminar, mirar, descubrir</Text><Text style={s.body}>Activá la ubicación con la app abierta. Al mover el mapa se pausa el centrado; podés volver con “Seguir mi ubicación”. No almacenamos tu caminata.</Text><Text style={s.sectionTitle}>Mapa de prueba</Text><Text style={s.body}>Explorá las calles con el mapa de OpenFreeMap y encontrá los encuentros guardados con sus fotos.</Text></View></ScrollView>}
+    <View style={s.navigation}>{([['explore', '◎', 'Explorar'], ['collection', '▧', 'Gatopedia'], ['profile', '♧', 'Mi aventura']] as const).map(([id, icon, label]) => <PlayfulPressable accessibilityRole="tab" accessibilityState={{ selected: tab === id }} key={id} onPress={() => { if (picking) { setPicking(false); setCapture(true); } setTab(id); }} style={[s.navButton, tab === id && s.navSelected]}><Text style={s.navIcon}>{icon}</Text><Text style={s.navLabel}>{label}</Text></PlayfulPressable>)}</View>
     <Modal visible={capture} animationType="slide" onRequestClose={() => { if (!busy && !saving) setCapture(false); }}><SafeAreaView style={s.root}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}><ScrollView contentContainerStyle={s.form} keyboardShouldPersistTaps="handled"><View style={s.dialogHeader}><View><Text style={s.eyebrow}>UN NUEVO ENCUENTRO</Text><Text style={s.title}>¡Hola, michi!</Text></View><Button label="✕ Cerrar" disabled={busy || saving} onPress={() => setCapture(false)} /></View>
-      <View style={s.photoBox}>{draft ? <Image source={{ uri: draft.uri }} resizeMode="contain" style={{ width: '100%', height: '100%' }} /> : <><Text style={s.bigCat}>📸</Text><Text style={s.body}>Acercate sin asustarlo</Text></>}</View>
+      <View style={s.photoBox}>{draft ? <Animated.Image key={draft.uri} entering={FadeInDown.duration(400)} source={{ uri: draft.uri }} resizeMode="contain" style={{ width: '100%', height: '100%' }} /> : <><Text style={s.bigCat}>📸</Text><Text style={s.body}>Acercate sin asustarlo</Text></>}</View>
       <View style={s.row}><Button label="Tomar foto" disabled={busy || saving} onPress={() => void choosePhoto(true)} /><Button label="Elegir foto" disabled={busy || saving} onPress={() => void choosePhoto(false)} /></View>{busy && <ActivityIndicator color={green} />}
       <Text style={s.label}>¿Ya lo conocés?</Text><ScrollView horizontal contentContainerStyle={s.row}><Button label="Michi nuevo" primary={!existing} onPress={() => setExisting(null)} />{collection.cats.map(c => <Button key={c.id} label={c.name} primary={existing === c.id} onPress={() => setExisting(c.id)} />)}</ScrollView>
       {!existing && <><Text style={s.label}>Nombre (opcional)</Text><TextInput accessibilityLabel="Nombre del michi" style={s.input} maxLength={60} placeholder="Por ejemplo, Don Bigotes" value={name} onChangeText={setName} /></>}
@@ -114,9 +163,10 @@ function Michipedia() {
       <Text style={s.label}>Latitud</Text><TextInput accessibilityLabel="Latitud" style={s.input} value={latitude} placeholder="-34.6037" autoCapitalize="none" onChangeText={v => { setLatitude(v); setManual(true); }} />
       <Text style={s.label}>Longitud</Text><TextInput accessibilityLabel="Longitud" style={s.input} value={longitude} placeholder="-58.3816" autoCapitalize="none" onChangeText={v => { setLongitude(v); setManual(true); }} />
       <Button label="📍 Elegir punto en el mapa" disabled={!draft || busy || saving} onPress={() => { setCapture(false); setTab('explore'); setFollow(false); setPicking(true); }} />
-      <Button label={saving ? 'Guardando…' : 'Guardar encuentro ♡'} primary disabled={!draft || busy || saving || !ready} onPress={() => void save()} /><Text style={s.note}>Se guarda en este dispositivo durante la alfa.</Text>
+      <Button label={saving ? 'Guardando…' : 'Guardar encuentro ♡'} primary disabled={!draft || busy || saving || !ready} onPress={() => void save()} /><Text style={s.note}>Se guarda en este dispositivo durante esta primera etapa.</Text>
     </ScrollView></KeyboardAvoidingView>{!!notice && <View pointerEvents="none" style={s.modalToast}><Text style={s.toastText}>{notice}</Text></View>}</SafeAreaView></Modal>
-    <Modal visible={!!cat} animationType="slide" onRequestClose={() => { if (!saving) { setSelectedCat(null); setPendingDelete(null); } }}><SafeAreaView style={s.root}><ScrollView contentContainerStyle={s.form}><Button label="← Volver" disabled={saving} onPress={() => { setSelectedCat(null); setPendingDelete(null); }} /><Text style={s.title}>{cat?.name}</Text>{collection.encounters.filter(e => e.catId === cat?.id).slice().reverse().map(e => <View key={e.id} style={s.encounter}><Image source={{ uri: e.photoUri }} resizeMode="contain" style={s.detailPhoto} /><Text style={s.body}>{new Date(e.capturedAt).toLocaleString('es-AR')}</Text><Text style={s.body}>{e.point.latitude.toFixed(5)}, {e.point.longitude.toFixed(5)} · {e.point.source === 'gps' ? 'GPS' : 'Punto manual'}</Text>{pendingDelete === e.id ? <View><Text style={s.body}>¿Eliminar este encuentro? Si es el último, también se eliminará el michi.</Text><View style={s.row}><Button label="Eliminar" disabled={saving} onPress={() => void remove()} /><Button label="Conservar" disabled={saving} onPress={() => setPendingDelete(null)} /></View></View> : <Button label="Eliminar encuentro" disabled={saving} onPress={() => setPendingDelete(e.id)} />}</View>)}</ScrollView>{!!notice && <View pointerEvents="none" style={s.modalToast}><Text style={s.toastText}>{notice}</Text></View>}</SafeAreaView></Modal>
+    <Modal visible={!!cat} animationType="slide" onRequestClose={() => { if (!saving) { setSelectedCat(null); setPendingDelete(null); } }}><SafeAreaView style={s.root}><ScrollView contentContainerStyle={s.form}><Button label="← Volver" disabled={saving} onPress={() => { setSelectedCat(null); setPendingDelete(null); }} /><Animated.Text key={cat?.id} entering={FadeInDown.duration(450)} style={s.title}>{cat?.name}</Animated.Text>{collection.encounters.filter(e => e.catId === cat?.id).slice().reverse().map(e => <View key={e.id} style={s.encounter}><Image source={{ uri: e.photoUri }} resizeMode="contain" style={s.detailPhoto} /><Text style={s.body}>{new Date(e.capturedAt).toLocaleString('es-AR')}</Text><Text style={s.body}>{e.point.latitude.toFixed(5)}, {e.point.longitude.toFixed(5)} · {e.point.source === 'gps' ? 'GPS' : 'Punto manual'}</Text>{pendingDelete === e.id ? <View><Text style={s.body}>¿Eliminar este encuentro? Si es el último, también se eliminará el michi.</Text><View style={s.row}><Button label="Eliminar" disabled={saving} onPress={() => void remove()} /><Button label="Conservar" disabled={saving} onPress={() => setPendingDelete(null)} /></View></View> : <Button label="Eliminar encuentro" disabled={saving} onPress={() => setPendingDelete(e.id)} />}</View>)}</ScrollView>{!!notice && <View pointerEvents="none" style={s.modalToast}><Text style={s.toastText}>{notice}</Text></View>}</SafeAreaView></Modal>
+    {celebration && <CatAddedCelebration visible catName={celebration.catName} catNumber={celebration.catNumber} photoUri={celebration.photoUri} onClose={() => setCelebration(null)} />}
     {!!notice && <View style={[s.toast, (capture || !!cat) && { zIndex: 100 }]} accessibilityLiveRegion="polite"><Text style={s.toastText}>{notice}</Text></View>}
 
   </SafeAreaView>;
