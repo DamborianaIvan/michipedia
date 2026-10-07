@@ -32,6 +32,8 @@ Copy-Item backend/.env.example backend/.env
 
 En `backend/.env`, completá `MONGODB_URI` con la base de Michipedia en Atlas y generá un `JWT_SECRET` privado. En `frontend/.env`, `EXPO_PUBLIC_API_URL=http://localhost:4000` apunta a la API local.
 
+Si la API no inicia, confirmá que el archivo se llame exactamente `backend/.env` y que incluya `MONGODB_URI` y un `JWT_SECRET` de al menos 32 caracteres. El inicio ahora distingue errores de configuración, URI mal formada, credenciales de MongoDB e IP no permitida por Atlas, sin imprimir secretos.
+
 Iniciá cada servicio en una terminal desde la raíz:
 
 ```sh

@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import { pathToFileURL } from 'node:url';
 import { config, validateConfig } from './config.js';
 import authRoutes from './routes/auth.js';
+import { describeStartupError } from './utils/startup-error.js';
 
 export const app = express();
 app.disable('x-powered-by');
@@ -35,7 +36,7 @@ export async function startServer() {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   startServer().catch((error) => {
-    console.error('No se pudo iniciar la API. Revisá la configuración y la conexión a MongoDB.');
+    console.error(describeStartupError(error));
     process.exitCode = 1;
   });
 }

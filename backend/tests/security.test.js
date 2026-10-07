@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { validateCredentials, validateRegistration } from '../utils/credentials.js';
+import { describeStartupError } from '../utils/startup-error.js';
 
 process.env.JWT_SECRET = 'test-only-secret-not-used-in-production-12345';
 const { app } = await import('../server.js');
@@ -13,6 +14,13 @@ test('rechaza cuerpos nulos, arrays e inyección de operadores', () => {
   }
   assert.ok(validateCredentials({ email: 'a'.repeat(255) + '@b.com', password: '12345678' }).error);
   assert.ok(validateCredentials({ email: 'a@b.com', password: 'á'.repeat(37) }).error);
+});
+
+test('diagnostica el arranque sin imprimir la URI ni credenciales', () => {
+  assert.match(describeStartupError(new Error('Falta configurar MONGODB_URI.')), /MONGODB_URI/);
+  assert.match(describeStartupError(Object.assign(new Error('secret uri'), { name: 'MongooseServerSelectionError' })), /IP.*habilitada/);
+  assert.match(describeStartupError(Object.assign(new Error('secret uri'), { code: 18 })), /MongoDB rechazó la autenticación/);
+  assert.doesNotMatch(describeStartupError(Object.assign(new Error('mongodb+srv://admin:secret@cluster'), { name: 'MongooseServerSelectionError' })), /secret|mongodb\+srv/i);
 });
 
 test('HTTP: salud, CORS, JSON inválido, límites y autenticación sin token', async () => {
