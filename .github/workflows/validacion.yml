@@ -1,0 +1,33 @@
+name: Validación de Michipedia
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  validar:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --include=optional
+      - run: npm run doctor
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:api
+      - run: npm run build:web
+        env:
+          EXPO_PUBLIC_API_URL: http://127.0.0.1:4000
+      - run: npm audit --workspace backend --omit=dev --audit-level=moderate
+      - name: Instalar navegador de regresión
+        if: runner.os == 'Linux'
+        run: |
+          npm install --prefix .browser-check --no-save --package-lock=false playwright@1.64.0
+          node .browser-check/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Probar worker y datos del mapa en desarrollo y exportación
+        if: runner.os == 'Linux'
+        run: node scripts/test-map-worker.cjs
