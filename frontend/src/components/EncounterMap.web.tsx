@@ -12,6 +12,7 @@ export default function EncounterMap(props: MapProps) {
   useEffect(() => {
     if (!container.current) return;
     try {
+      maplibregl.setWorkerUrl(new URL(`/maplibre/${maplibregl.getVersion()}/maplibre-gl-worker.mjs`, window.location.origin).href);
       const instance = new maplibregl.Map({ container: container.current, style: mapStyle, center: [-58.3816, -34.6037], zoom: 12 }); map.current = instance;
       instance.addControl(new maplibregl.NavigationControl(), 'top-right');
       instance.addControl(new maplibregl.FullscreenControl(), 'top-right');

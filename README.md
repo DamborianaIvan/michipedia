@@ -169,3 +169,7 @@ npm run web:clean
 - Antes de exposición pública: HTTPS, usuario Atlas con permisos mínimos, secretos privados, verificación de correo/recuperación de cuenta y diseño de revocación de sesiones. El cierre de sesión local no revoca tokens ya emitidos.
 
 La automatización de GitHub ejecuta instalación, comprobación de binarios, pruebas y exportación web en Windows y Linux, y auditoría de dependencias del backend.
+
+### Worker del mapa web
+
+`frontend/metro.config.js` copia el worker de MapLibre y su módulo compartido a `frontend/public/maplibre/<versión>/` al iniciar Metro. Expo los sirve en desarrollo y los incluye en la exportación web. El mapa configura esa URL antes de crearse, para que el worker corresponda a la versión instalada. Los archivos generados no se versionan. Si cambiás esta configuración, detené Expo y ejecutá `npm run web:clean`.

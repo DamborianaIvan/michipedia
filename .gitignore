@@ -42,3 +42,7 @@ yarn-error.*
 # generated native folders
 **/ios/
 **/android/
+
+# Generated from the installed MapLibre version by Metro
+/frontend/public/maplibre/
+/.browser-check/
